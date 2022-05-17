@@ -123,6 +123,11 @@ contract Ballot {
         proposals[proposal].voteCount += sender.weight;
     }
 
+    /// @dev Queries all the proposals
+    function getProposals() public view returns (Proposal[] memory) {
+        return proposals;
+    }
+
     /// @dev Computes the winning proposal taking all
     /// previous votes into account.
     function winningProposal() public view returns (uint256 winningProposal_) {
