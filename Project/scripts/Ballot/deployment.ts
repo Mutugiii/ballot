@@ -1,6 +1,10 @@
 import { ethers } from "ethers";
 import "dotenv/config";
-import * as ballotJson from "../../artifacts/contracts/Ballot.sol/Ballot.json";
+// eslint-disable-next-line node/no-missing-import
+import { Ballot } from "../../typechain";
+import BallotArtifact from "../../artifacts/contracts/Ballot.sol/Ballot.json";
+
+const PROPASALS = ["Proposal 1", "Proposal 2", "Proposal 3"];
 
 // This key is already public on Herong's Tutorial Examples - v1.03, by Dr. Herong Yang
 // Do never expose your keys like this
@@ -16,41 +20,63 @@ function convertStringArrayToBytes32(array: string[]) {
 }
 
 async function main() {
+  // Signer and Provider setup
   const wallet =
     process.env.MNEMONIC && process.env.MNEMONIC.length > 0
       ? ethers.Wallet.fromMnemonic(process.env.MNEMONIC)
       : new ethers.Wallet(process.env.PRIVATE_KEY ?? EXPOSED_KEY);
-  console.log(`Using address ${wallet.address}`);
+
   const provider = ethers.providers.getDefaultProvider("ropsten");
+  console.log(`Using address ${wallet.address}`);
   const signer = wallet.connect(provider);
+
+  // Signer interaction
   const balanceBN = await signer.getBalance();
   const balance = Number(ethers.utils.formatEther(balanceBN));
-  console.log(`Wallet balance ${balance}`);
-  if (balance < 0.01) {
-    throw new Error("Not enough ether");
-  }
-  console.log("Deploying Ballot contract");
-  console.log("Proposals: ");
-  const proposals = process.argv.slice(2);
-  if (proposals.length < 2) throw new Error("Not enough proposals provided");
-  proposals.forEach((element, index) => {
-    console.log(`Proposal N. ${index + 1}: ${element}`);
-  });
+  console.log(` Wallet balance ${balance}`);
+  if (balance < 0.01) throw new Error("Not enough eth for deployment");
+
+  // Provider interaction
+  const lastBlock = await provider.getBlock("latest");
+  console.log(
+    ` Connected to the ropsten network at height ${lastBlock.number}`
+  );
+
+  // If you wish to pass the proposals as arguments and not in a predefined list
+  // console.log("Enter Proposals: ");
+  // const proposals = process.argv.slice(2);
+  // if (proposals.length < 2) throw new Error("Not enough proposals provided");
+  // proposals.forEach((element, index) => {
+  //   console.log(`Proposal N. ${index} : ${element}`);
+  // });
+
+  // Lead up to Deployment
   const ballotFactory = new ethers.ContractFactory(
-    ballotJson.abi,
-    ballotJson.bytecode,
+    BallotArtifact.abi,
+    BallotArtifact.bytecode,
     signer
   );
-  const ballotContract = await ballotFactory.deploy(
-    convertStringArrayToBytes32(proposals)
-  );
+  console.log("Deploying the contract");
+  const ballotContract: Ballot = (await ballotFactory.deploy(
+    convertStringArrayToBytes32(PROPASALS)
+  )) as Ballot;
   console.log("Awaiting confirmations");
   await ballotContract.deployed();
-  console.log("Completed");
+  console.log("Deployment completed");
   console.log(`Contract deployed at ${ballotContract.address}`);
+
+  // Iterating over the proposals
+  // for (let index = 0; index < PROPASALS.length; index++) {
+  //   const proposal = await ballotContract.proposals(index);
+  //   console.log(
+  //     `Proposal at ${index} is named ${ethers.utils.parseBytes32String(
+  //       proposal[0]
+  //     )}`
+  //   );
+  // }
 }
 
-main().catch((error) => {
-  console.error(error);
+main().catch((err) => {
+  console.error(err);
   process.exitCode = 1;
 });
