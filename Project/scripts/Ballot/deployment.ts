@@ -1,15 +1,10 @@
+/* eslint-disable node/no-missing-import */
 import { ethers } from "ethers";
-import "dotenv/config";
-// eslint-disable-next-line node/no-missing-import
 import { Ballot } from "../../typechain";
 import BallotArtifact from "../../artifacts/contracts/Ballot.sol/Ballot.json";
+import { SignerProviderSetup } from "../utils/Signer";
 
 const PROPASALS = ["Proposal 1", "Proposal 2", "Proposal 3"];
-
-// This key is already public on Herong's Tutorial Examples - v1.03, by Dr. Herong Yang
-// Do never expose your keys like this
-const EXPOSED_KEY =
-  "8da4ef21b864d2cc526dbdb2a120bd2874c36c9d0a1fb7f8c63d7f7a8b41de8f";
 
 function convertStringArrayToBytes32(array: string[]) {
   const bytes32Array = [];
@@ -20,21 +15,8 @@ function convertStringArrayToBytes32(array: string[]) {
 }
 
 async function main() {
-  // Signer and Provider setup
-  const wallet =
-    process.env.MNEMONIC && process.env.MNEMONIC.length > 0
-      ? ethers.Wallet.fromMnemonic(process.env.MNEMONIC)
-      : new ethers.Wallet(process.env.PRIVATE_KEY ?? EXPOSED_KEY);
-
-  const provider = ethers.providers.getDefaultProvider("ropsten");
-  console.log(`Using address ${wallet.address}`);
-  const signer = wallet.connect(provider);
-
-  // Signer interaction
-  const balanceBN = await signer.getBalance();
-  const balance = Number(ethers.utils.formatEther(balanceBN));
-  console.log(` Wallet balance ${balance}`);
-  if (balance < 0.01) throw new Error("Not enough eth for deployment");
+  const { signer, provider }: { signer: any; provider: any } =
+    await SignerProviderSetup();
 
   // Provider interaction
   const lastBlock = await provider.getBlock("latest");
