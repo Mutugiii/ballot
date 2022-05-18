@@ -22,9 +22,5 @@ export const SignerProviderSetup = async () => {
     throw new Error("Not enough ether");
   }
 
-  // Provider interaction
-  const lastBlock = await provider.getBlock("latest");
-  console.log(`Connected to the ropsten network at height ${lastBlock.number}`);
-
   return { wallet, signer, provider };
 };

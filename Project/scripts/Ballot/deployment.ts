@@ -20,9 +20,7 @@ async function main() {
 
   // Provider interaction
   const lastBlock = await provider.getBlock("latest");
-  console.log(
-    ` Connected to the ropsten network at height ${lastBlock.number}`
-  );
+  console.log(`Connected to the ropsten network at height ${lastBlock.number}`);
 
   // If you wish to pass the proposals as arguments and not in a predefined list
   // console.log("Enter Proposals: ");
