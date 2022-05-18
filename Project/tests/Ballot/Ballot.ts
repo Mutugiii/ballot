@@ -60,167 +60,190 @@ describe("Ballot", function () {
   });
 
   describe("when the chairperson interacts with the giveRightToVote function in the contract", function () {
-    it("gives right to vote for another address", async function () {
-      const voterAddress = accounts[1].address;
-      await giveRightToVote(ballotContract, voterAddress);
-      const voter = await ballotContract.voters(voterAddress);
-      expect(voter.weight.toNumber()).to.eq(1);
+    let voterAddress: any;
+
+    this.beforeEach(async function () {
+      voterAddress = accounts[1].address;
     });
 
-    it("can not give right to vote for someone that has voted", async function () {
-      const voterAddress = accounts[1].address;
-      await giveRightToVote(ballotContract, voterAddress);
-      await ballotContract.connect(accounts[1]).vote(0);
-      await expect(
-        giveRightToVote(ballotContract, voterAddress)
-      ).to.be.revertedWith("The voter already voted.");
+    describe("does not have right to vote", async function () {
+      it("triggers the NewVoter event with the address of the new voter", async function () {
+        await expect(ballotContract.giveRightToVote(voterAddress))
+          .to.emit(ballotContract, "NewVoter")
+          .withArgs(voterAddress);
+      });
     });
 
-    it("can not give right to vote for someone that has already voting rights", async function () {
-      const voterAddress = accounts[1].address;
-      await giveRightToVote(ballotContract, voterAddress);
-      await expect(
-        giveRightToVote(ballotContract, voterAddress)
-      ).to.be.revertedWith("");
+    describe("has right to vote", async function () {
+      this.beforeEach(async function () {
+        await giveRightToVote(ballotContract, voterAddress);
+      });
+
+      it("gives right to vote for another address", async function () {
+        const voter = await ballotContract.voters(voterAddress);
+        expect(voter.weight.toNumber()).to.eq(1);
+      });
+
+      it("can not give right to vote for someone that has voted", async function () {
+        await ballotContract.connect(accounts[1]).vote(0);
+        await expect(
+          giveRightToVote(ballotContract, voterAddress)
+        ).to.be.revertedWith("The voter already voted.");
+      });
+
+      it("can not give right to vote for someone that has already voting rights", async function () {
+        await expect(
+          giveRightToVote(ballotContract, voterAddress)
+        ).to.be.revertedWith("");
+      });
     });
   });
 
   describe("when the voter interact with the vote function in the contract", function () {
-    it("should revert if the voter has not been given right to vote", async function () {
-      await expect(
-        ballotContract.connect(accounts[1]).vote(0)
-      ).to.be.revertedWith("Has no right to vote");
+    let voter: any;
+
+    beforeEach(async function () {
+      voter = voter = accounts[1];
     });
 
-    it("should revert if the voter has already voted", async function () {
-      const voter = accounts[1];
-      await giveRightToVote(ballotContract, voter.address);
-      await ballotContract.connect(voter).vote(1);
-      await expect(ballotContract.connect(voter).vote(1)).to.be.revertedWith(
-        "Already voted."
-      );
+    describe("when the voter does not have voting rights", function () {
+      it("should revert if the voter has not been given right to vote", async function () {
+        await expect(ballotContract.connect(voter).vote(0)).to.be.revertedWith(
+          "Has no right to vote"
+        );
+      });
     });
 
-    it("should set the voted property to true", async function () {
-      const voter = accounts[1];
-      await giveRightToVote(ballotContract, voter.address);
-      await ballotContract.connect(voter).vote(1);
-      const voterData = await ballotContract.voters(accounts[1].address);
-      expect(voterData.voted).to.eq(true);
+    describe("when the voter has voting rights but has not voted)", function () {
+      this.beforeEach(async function () {
+        await giveRightToVote(ballotContract, voter.address);
+      });
+
+      it("triggers the Voted event", async function () {
+        await expect(ballotContract.connect(voter).vote(1))
+          .to.emit(ballotContract, "Voted")
+          .withArgs(voter.address, 1, 1);
+      });
     });
 
-    it("should set vote property to proposal of choice", async function () {
-      const voter = accounts[1];
-      await giveRightToVote(ballotContract, voter.address);
-      await ballotContract.connect(voter).vote(1);
-      const voterData = await ballotContract.voters(accounts[1].address);
-      expect(voterData.vote).to.eq(1);
-    });
+    describe("when the voter has voting rights and has voted for proposal 2(index 1)", function () {
+      this.beforeEach(async function () {
+        await giveRightToVote(ballotContract, voter.address);
+        await ballotContract.connect(voter).vote(1);
+      });
 
-    it("should increment the proposal's vote count with the sender weight", async function () {
-      const voter = accounts[1];
-      await giveRightToVote(ballotContract, voter.address);
-      // Vote as chairperson
-      await ballotContract.vote(1);
-      // Vote as a voter
-      await ballotContract.connect(voter).vote(1);
-      const proposalData = await ballotContract.proposals(1);
-      expect(proposalData.voteCount).to.eq(2);
+      it("should revert if the voter has already voted", async function () {
+        await expect(ballotContract.connect(voter).vote(1)).to.be.revertedWith(
+          "Already voted."
+        );
+      });
+
+      it("should set the voted property to true", async function () {
+        const voterData = await ballotContract.voters(accounts[1].address);
+        expect(voterData.voted).to.eq(true);
+      });
+
+      it("should set vote property to proposal of choice", async function () {
+        const voterData = await ballotContract.voters(accounts[1].address);
+        expect(voterData.vote).to.eq(1);
+      });
+
+      it("should increment the proposal's vote count with the sender weight", async function () {
+        // Vote as chairperson as well
+        await ballotContract.vote(1);
+        const proposalData = await ballotContract.proposals(1);
+        expect(proposalData.voteCount).to.eq(2);
+      });
     });
   });
 
   describe("when the voter interact with the delegate function in the contract", function () {
-    it("should not allow self delegation", async function () {
-      const voter = accounts[1];
-      await expect(
-        ballotContract.connect(voter).delegate(voter.address)
-      ).to.be.revertedWith("Self-delegation is disallowed.");
+    let voter: any, delegatee: any, finalDelegatee: any;
+
+    beforeEach(async function () {
+      voter = accounts[1];
+      delegatee = accounts[2];
+      finalDelegatee = accounts[3];
     });
 
-    it("should revert if msg.sender is found in the delegation loop", async function () {
-      const voter = accounts[1];
-      const delegatee = accounts[2];
-      await giveRightToVote(ballotContract, voter.address);
-      await giveRightToVote(ballotContract, delegatee.address);
-      await ballotContract.connect(delegatee).delegate(voter.address);
-      await expect(
-        ballotContract.connect(voter).delegate(delegatee.address)
-      ).to.be.revertedWith("Found loop in delegation.");
+    describe("when the voter does not have voting rights", function () {
+      it("should not allow delegation to wallets that cannot vote", async function () {
+        await expect(ballotContract.connect(voter).delegate(delegatee.address))
+          .to.be.reverted;
+      });
     });
 
-    it("should delegate to other address(delegatee's delegate) if delegatee has delegated", async function () {
-      const voter = accounts[1];
-      const delegatee = accounts[2];
-      const finalDelegatee = accounts[3];
-      await giveRightToVote(ballotContract, voter.address);
-      await giveRightToVote(ballotContract, delegatee.address);
-      await giveRightToVote(ballotContract, finalDelegatee.address);
-      // Delegatee has delegated to another address before voter delegates
-      await ballotContract.connect(delegatee).delegate(finalDelegatee.address);
-      await ballotContract.connect(voter).delegate(delegatee.address);
-      const voterData = await ballotContract.voters(voter.address);
-      expect(voterData.delegate).to.eq(finalDelegatee.address);
-    });
+    describe("when the voter has voting rights", function () {
+      this.beforeEach(async function () {
+        await giveRightToVote(ballotContract, voter.address);
+        await giveRightToVote(ballotContract, delegatee.address);
+        await giveRightToVote(ballotContract, finalDelegatee.address);
+      });
 
-    it("should not allow delegation if you have voted", async function () {
-      const voter = accounts[1];
-      await giveRightToVote(ballotContract, voter.address);
-      await ballotContract.connect(voter).vote(1);
-      await expect(
-        ballotContract.connect(voter).delegate(accounts[2].address)
-      ).to.be.revertedWith("You already voted.");
-    });
+      it("should not allow self delegation", async function () {
+        await expect(
+          ballotContract.connect(voter).delegate(voter.address)
+        ).to.be.revertedWith("Self-delegation is disallowed.");
+      });
 
-    it("should not allow delegation to wallets that cannot vote", async function () {
-      await expect(
-        ballotContract.connect(accounts[1]).delegate(accounts[2].address)
-      ).to.be.reverted;
-    });
+      it("should revert if msg.sender is found in the delegation loop", async function () {
+        await ballotContract.connect(voter).delegate(delegatee.address);
+        await expect(
+          ballotContract.connect(delegatee).delegate(voter.address)
+        ).to.be.revertedWith("Found loop in delegation.");
+      });
 
-    it("should set the voted property to true after delegation", async function () {
-      const voter = accounts[1];
-      const delegatee = accounts[2];
-      // Give right to vote to both voter and delegatee
-      await giveRightToVote(ballotContract, voter.address);
-      await giveRightToVote(ballotContract, delegatee.address);
-      await ballotContract.connect(voter).delegate(delegatee.address);
-      const voterData = await ballotContract.voters(voter.address);
-      expect(voterData.voted).to.eq(true);
-    });
+      it("should delegate to other address(delegatee's delegate) if delegatee has delegated", async function () {
+        // Delegatee has delegated to another address before voter delegates
+        await ballotContract
+          .connect(delegatee)
+          .delegate(finalDelegatee.address);
+        await ballotContract.connect(voter).delegate(delegatee.address);
+        const voterData = await ballotContract.voters(voter.address);
+        expect(voterData.delegate).to.eq(finalDelegatee.address);
+      });
 
-    it("should set delegate property to the required account", async function () {
-      const voter = accounts[1];
-      const delegatee = accounts[2];
-      // Give right to vote to both voter and delegatee
-      await giveRightToVote(ballotContract, voter.address);
-      await giveRightToVote(ballotContract, delegatee.address);
-      await ballotContract.connect(voter).delegate(delegatee.address);
-      const voterData = await ballotContract.voters(voter.address);
-      expect(voterData.delegate).to.eq(delegatee.address);
-    });
+      it("should not allow delegation if you have voted", async function () {
+        await ballotContract.connect(voter).vote(1);
+        await expect(
+          ballotContract.connect(voter).delegate(accounts[2].address)
+        ).to.be.revertedWith("You already voted.");
+      });
 
-    it("should add direct to proposal votes if delegatee has already voted", async function () {
-      const voter = accounts[1];
-      const delegatee = accounts[2];
-      // Give right to vote to both voter and delegatee
-      await giveRightToVote(ballotContract, voter.address);
-      await giveRightToVote(ballotContract, delegatee.address);
-      // Delegatee has voted
-      await ballotContract.connect(delegatee).vote(1);
-      expect((await ballotContract.proposals(1)).voteCount).to.be.eq(1);
-      await ballotContract.connect(voter).delegate(delegatee.address);
-      expect((await ballotContract.proposals(1)).voteCount).to.be.eq(2);
-    });
+      it("should set the voted property to true after delegation", async function () {
+        await ballotContract.connect(voter).delegate(delegatee.address);
+        const voterData = await ballotContract.voters(voter.address);
+        expect(voterData.voted).to.eq(true);
+      });
 
-    it("should add to the delegatee weight if the delegetee has not voted", async function () {
-      const voter = accounts[1];
-      const delegatee = accounts[2];
-      // Give right to vote to both voter and delegatee
-      await giveRightToVote(ballotContract, voter.address);
-      await giveRightToVote(ballotContract, delegatee.address);
-      expect((await ballotContract.voters(delegatee.address)).weight).to.eq(1);
-      await ballotContract.connect(voter).delegate(delegatee.address);
-      expect((await ballotContract.voters(delegatee.address)).weight).to.eq(2);
+      it("should set delegate property to the required account", async function () {
+        await ballotContract.connect(voter).delegate(delegatee.address);
+        const voterData = await ballotContract.voters(voter.address);
+        expect(voterData.delegate).to.eq(delegatee.address);
+      });
+
+      it("should add direct to proposal votes if delegatee has already voted", async function () {
+        await ballotContract.connect(delegatee).vote(1);
+        expect((await ballotContract.proposals(1)).voteCount).to.be.eq(1);
+        await ballotContract.connect(voter).delegate(delegatee.address);
+        expect((await ballotContract.proposals(1)).voteCount).to.be.eq(2);
+      });
+
+      it("should add to the delegatee weight if the delegetee has not voted", async function () {
+        expect((await ballotContract.voters(delegatee.address)).weight).to.eq(
+          1
+        );
+        await ballotContract.connect(voter).delegate(delegatee.address);
+        expect((await ballotContract.voters(delegatee.address)).weight).to.eq(
+          2
+        );
+      });
+
+      it("triggers the Delegated event", async function () {
+        await expect(ballotContract.connect(voter).delegate(delegatee.address))
+          .to.emit(ballotContract, "Delegated")
+          .withArgs(voter.address, delegatee.address, 2, false, 0, 0);
+      });
     });
   });
 
@@ -241,16 +264,19 @@ describe("Ballot", function () {
   });
 
   describe("when the an attacker interact with the delegate function in the contract", function () {
+    let attacker: any, delegatee: any;
+
+    this.beforeEach(async function () {
+      attacker = accounts[1];
+      delegatee = accounts[2];
+    });
+
     it("should be reverted if delegatee has no weight", async function () {
-      const attacker = accounts[1];
-      const delegatee = accounts[2];
       await expect(ballotContract.connect(attacker).delegate(delegatee.address))
         .to.be.reverted;
     });
 
     it("should delegate with a weight of 0 if the delegatee has the rights to vote", async function () {
-      const attacker = accounts[1];
-      const delegatee = accounts[2];
       await giveRightToVote(ballotContract, delegatee.address);
       await ballotContract.connect(attacker).delegate(delegatee.address);
       const delegateeData = await ballotContract.voters(delegatee.address);
@@ -291,7 +317,7 @@ describe("Ballot", function () {
   });
 
   describe("when someone interact with the winningProposal function and winnerName after 5 random votes are cast for the proposals", function () {
-    it("(winningProposal) should return the index of the most voted for proposal", async function () {
+    this.beforeEach(async function () {
       for (let i = 1; i < 5; i++) {
         await ballotContract.giveRightToVote(accounts[i].address);
       }
@@ -301,20 +327,13 @@ describe("Ballot", function () {
       await ballotContract.connect(accounts[2]).vote(2);
       await ballotContract.connect(accounts[3]).vote(0);
       await ballotContract.connect(accounts[4]).vote(2);
+    });
 
+    it("(winningProposal) should return the index of the most voted for proposal", async function () {
       expect(await ballotContract.winningProposal()).to.be.eq(2);
     });
+
     it("(winnerName) should return the name of the most voted for proposal", async function () {
-      for (let i = 1; i < 5; i++) {
-        await ballotContract.giveRightToVote(accounts[i].address);
-      }
-
-      await ballotContract.vote(2);
-      await ballotContract.connect(accounts[1]).vote(1);
-      await ballotContract.connect(accounts[2]).vote(2);
-      await ballotContract.connect(accounts[3]).vote(0);
-      await ballotContract.connect(accounts[4]).vote(2);
-
       const winningName = await ballotContract.winnerName();
       expect(ethers.utils.parseBytes32String(winningName)).to.be.eq(
         "Proposal 3"
