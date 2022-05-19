@@ -1,9 +1,8 @@
+/* eslint-disable node/no-missing-import */
 import { expect } from "chai";
 import { ethers } from "hardhat";
-// eslint-disable-next-line node/no-missing-import
 import { Ballot } from "../../typechain";
-
-const PROPOSALS = ["Proposal 1", "Proposal 2", "Proposal 3"];
+import { PROPOSALS } from "../../scripts/utils/Proposals";
 
 function convertStringArrayToBytes32(array: string[]) {
   const bytes32Array = [];

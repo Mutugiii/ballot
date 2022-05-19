@@ -1,11 +1,11 @@
 /* eslint-disable node/no-missing-import */
-import { Contract } from "ethers";
+import { Contract, ethers } from "ethers";
 import BallotArtifact from "../../artifacts/contracts/Ballot.sol/Ballot.json";
 import { Ballot } from "../../typechain";
 import { SignerProviderSetup } from "../utils/Signer";
 
 async function main() {
-  const { signer }: { signer: any } = await SignerProviderSetup();
+  const { signer }: { signer: ethers.Signer } = await SignerProviderSetup();
 
   if (process.argv.length < 3) throw new Error("Ballot address missing");
   const ballotAddress = process.argv[2];
@@ -22,7 +22,8 @@ async function main() {
   ) as Ballot;
 
   const chairpersonAddress = await ballotContract.chairperson();
-  if (chairpersonAddress !== signer.address)
+  const signerAddress = await signer.getAddress();
+  if (chairpersonAddress !== signerAddress)
     throw new Error("Caller is not the chairperson for this contract");
 
   console.log(`Giving right to vote to ${voterAddress}`);

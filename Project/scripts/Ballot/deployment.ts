@@ -3,8 +3,7 @@ import { ethers } from "ethers";
 import { Ballot } from "../../typechain";
 import BallotArtifact from "../../artifacts/contracts/Ballot.sol/Ballot.json";
 import { SignerProviderSetup } from "../utils/Signer";
-
-const PROPASALS = ["Proposal 1", "Proposal 2", "Proposal 3"];
+import { PROPOSALS } from "../utils/Proposals";
 
 function convertStringArrayToBytes32(array: string[]) {
   const bytes32Array = [];
@@ -15,7 +14,10 @@ function convertStringArrayToBytes32(array: string[]) {
 }
 
 async function main() {
-  const { signer, provider }: { signer: any; provider: any } =
+  const {
+    signer,
+    provider,
+  }: { signer: ethers.Signer; provider: ethers.providers.BaseProvider } =
     await SignerProviderSetup();
 
   // Provider interaction
@@ -38,7 +40,7 @@ async function main() {
   );
   console.log("Deploying the contract");
   const ballotContract: Ballot = (await ballotFactory.deploy(
-    convertStringArrayToBytes32(PROPASALS)
+    convertStringArrayToBytes32(PROPOSALS)
   )) as Ballot;
   console.log("Awaiting confirmations");
   await ballotContract.deployed();

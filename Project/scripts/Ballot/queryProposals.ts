@@ -5,7 +5,7 @@ import { Ballot } from "../../typechain";
 import { SignerProviderSetup } from "../utils/Signer";
 
 async function main() {
-  const { signer }: { signer: any } = await SignerProviderSetup();
+  const { signer }: { signer: ethers.Signer } = await SignerProviderSetup();
 
   if (process.argv.length < 3) throw new Error("Ballot Address missing");
   const ballotAddress = process.argv[2];
